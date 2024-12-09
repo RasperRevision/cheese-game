@@ -1,63 +1,73 @@
-from pygame import image, Surface, Rect
-from numpy import zeros, random
+import csv
+
+from numpy import array
+from pygame import Rect, Surface, image
+
 
 class Tileset:
     def __init__(self, file):
         self.file = file
+        
         self.image = image.load(file)
         self.rect = self.image.get_rect()
         self.tiles = []
+        
         self.load()
     
     def load(self):
-        self.tiles = []
-        x0 = y0 = 0
         w, h = self.rect.size
-        dx = 16
-        dy = 16
+        dx = dy = 16
         
-        for x in range(x0, w, dx):
-            for y in range(y0, h, dy):
-                tile = Surface(self.size)
-                tile.blit(self.image, (0, 0), (x, y, *self.size))
+        for x in range(0, w//dx):
+            for y in range(0, h//dy):
+                tile = Surface((dx, dy))
+                tile.blit(self.image, (0, 0), area=Rect((x*dx, y*dy), (dx, dy)))
                 self.tiles.append(tile)
-
-    def __str__(self):
-        return f'{self.__class__.__name__} file:{self.file} tile:{self.size}'
-
 
 
 class Tilemap:
-    def __init__(self, tileset, size=(10, 20), rect=None):
-        self.size = size
+    def __init__(self, tileset, screen, screenSize):
         self.tileset = tileset
-        self.map = zeros(size, dtype=int)
+        self.screen = screen
+        self.screenWidth, self.screenHeight = screenSize
 
-        h, w = self.size
-        self.image = Surface((32*w, 32*h))
-        if rect:
-            self.rect = Rect(rect)
-        else:
-            self.rect = self.image.get_rect()
+        self.map, self.size = self.get_map('assets/tilemap/map.csv')
+        self.rect = tileset.rect
+        
+        self.positionOffset = [self.screenWidth // 2 - self.size[0] * 8 + 8,
+                               self.screenHeight // 2 - self.size[1] * 8 + 8]
+        self.position = [self.positionOffset[0], self.positionOffset[1]]
+
+
+        self.render()
+
 
     def render(self):
-        m, n = self.map.shape
-        for i in range(m):
-            for j in range(n):
+        self.screen.fill('black')
+        for i in range(self.size[0]):
+            for j in range(self.size[1]):
                 tile = self.tileset.tiles[self.map[i, j]]
-                self.image.blit(tile, (j*32, i*32))
+                
+                self.screen.blit(tile, (j*16+self.position[0], 
+                                        i*16+self.position[1]))
 
-    def set_zero(self):
-        self.map = zeros(self.size, dtype=int)
-        print(self.map)
-        print(self.map.shape)
+    def get_map(self, map):
+        with open(map, 'r') as file:
+            rows = list(csv.reader(file))
+            new_rows = []
+            for row in rows:
+                new_row = []
+                for num in row:
+                    new_row.append(int(num))
+                new_rows.append(new_row)
+                
+        a = array(new_rows)
+        return (a, a.shape)
+            
+
+    def adjustPosition(self, playerPos):
+        x, y = playerPos
+        self.position = [self.positionOffset[0] - x + self.screenWidth // 2, 
+                         self.positionOffset[1] - y + self.screenHeight // 2]
         self.render()
-
-    def set_random(self):
-        n = len(self.tileset.tiles)
-        self.map = random.randint(n, size=self.size)
-        print(self.map)
-        self.render()
-
-    def __str__(self):
-        return f'{self.__class__.__name__} {self.size}'      
+        
